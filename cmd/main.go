@@ -10,7 +10,7 @@ import (
 
 var tableName = "hosts"
 
-func HandleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) *events.LambdaFunctionURLResponse {
+func HandleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (*events.LambdaFunctionURLResponse, error) {
 	logger, _ := requestbin.NewLogger()
 	defer logger.Sync()
 	logger.Infow("request", "request", request)
@@ -21,19 +21,19 @@ func HandleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 			StatusCode: 500,
 			Headers:    map[string]string{"Content-Type": "text/plain"},
 			Body:       "Internal Server Error",
-		}
+		}, nil
 	}
 	if request.RequestContext.HTTP.Method != "POST" {
 		return &events.LambdaFunctionURLResponse{
 			StatusCode: 405,
 			Headers:    map[string]string{"Content-Type": "text/plain"},
 			Body:       "Method Not Allowed",
-		}
+		}, nil
 	}
 	return &events.LambdaFunctionURLResponse{
 		StatusCode: 200,
 		Headers:    map[string]string{"Content-Type": "text/plain"},
-	}
+	}, nil
 }
 
 func main() {
