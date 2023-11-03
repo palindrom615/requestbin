@@ -5,15 +5,16 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/palindrom615/requestbin"
 )
 
 var tableName = "hosts"
 
 func HandleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) *events.LambdaFunctionURLResponse {
-	logger, _ := NewLogger()
+	logger, _ := requestbin.NewLogger()
 	defer logger.Sync()
 	logger.Infow("request", "request", request)
-	db := NewDB(tableName, logger)
+	db := requestbin.NewDB(tableName, logger)
 	err := db.PutValue(request.RequestContext.RequestID, request.Body)
 	if err != nil {
 		return &events.LambdaFunctionURLResponse{

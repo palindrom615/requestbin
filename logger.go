@@ -1,4 +1,4 @@
-package main
+package requestbin
 
 import "go.uber.org/zap"
 

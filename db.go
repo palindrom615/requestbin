@@ -1,4 +1,4 @@
-package main
+package requestbin
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
@@ -21,7 +21,7 @@ func (db *DB) PutValue(key string, val string) error {
 	sess := session.Must(session.NewSession())
 	svc := dynamodb.New(sess)
 	putItemInput := &dynamodb.PutItemInput{
-		TableName: aws.String(tableName),
+		TableName: aws.String(db.tableName),
 		Item:      map[string]*dynamodb.AttributeValue{},
 	}
 	_, err := svc.PutItem(putItemInput)
