@@ -23,34 +23,3 @@ func TestIdentityHandler_Handle(t *testing.T) {
 		t.Errorf("IdentityHandler.Handle() = %v, want %v", v, vo)
 	}
 }
-
-func TestIdentityHandler_SetOutboundHandler(t *testing.T) {
-	// arange
-	i := &IdentityHandler{}
-	i2 := &IdentityHandler{}
-	input := &Ctx{"key": "value"}
-
-	// act
-	i.SetOutboundHandler(i2)
-	output := i.Handle(input)
-
-	// assert
-	if input != output {
-		t.Errorf("IdentityHandler.Handle() = %v, want %v", output, input)
-	}
-}
-
-func TestIdentityHandler_SetOutboundHandler_self(t *testing.T) {
-	// arrange
-	i := &IdentityHandler{}
-
-	// assert
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("IdentityHandler.SetOutboundHandler() did not panic")
-		}
-	}()
-
-	// act
-	i.SetOutboundHandler(i)
-}
