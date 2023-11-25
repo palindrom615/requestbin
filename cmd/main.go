@@ -27,10 +27,10 @@ func HandleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 		panic(err)
 	}
 
-	h := handler.NewComposeHandler(
+	h := handler.NewSequentialHandler(
 		handler.NewEmbedCtxHandler(
-			func(ctx context.Context, input interface{}) (handler.CtxKey, any) {
-				return requestCtxKey, input
+			func(ctx context.Context, input any) (handler.CtxKey, any) {
+				return requestCtxKey, input.(events.LambdaFunctionURLRequest)
 			},
 		),
 		buildDynamoDbHandler(awsCfg, "host"),
