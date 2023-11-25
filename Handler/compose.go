@@ -13,11 +13,9 @@ func NewComposeHandler(handlers ...Handler[interface{}, interface{}]) *ComposeHa
 }
 
 func (h *ComposeHandler) Handle(ctx context.Context, input <-chan interface{}) (context.Context, <-chan interface{}) {
-	out := make(chan interface{})
 	lastOutput := input
 	for _, handler := range h.handlers {
 		ctx, lastOutput = handler.Handle(ctx, lastOutput)
 	}
-	out <- <-input
-	return ctx, out
+	return ctx, lastOutput
 }

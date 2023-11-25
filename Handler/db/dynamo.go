@@ -9,9 +9,9 @@ import (
 )
 
 type DynamoPutHandler struct {
-	dynamoDbClient    DynamoDBAPI
-	tableName         string
-	mapInputToPutItem func(context context.Context, input interface{}) map[string]types.AttributeValue
+	dynamoDbClient DynamoDBAPI
+	tableName      string
+	mapFunc        func(context context.Context, input interface{}) map[string]types.AttributeValue
 }
 
 type DynamoDBAPI interface {
@@ -24,9 +24,9 @@ func NewDynamoPutHandler(
 	getItem func(context context.Context, input interface{}) map[string]types.AttributeValue,
 ) *DynamoPutHandler {
 	return &DynamoPutHandler{
-		dynamoDbClient:    db,
-		tableName:         tableName,
-		mapInputToPutItem: getItem,
+		dynamoDbClient: db,
+		tableName:      tableName,
+		mapFunc:        getItem,
 	}
 }
 
@@ -36,7 +36,8 @@ func (h *DynamoPutHandler) Handle(ctx context.Context, input <-chan interface{})
 
 	select {
 	case i := <-input:
-		p := h.mapInputToPutItem(ctx, i)
+		output := make(chan any)
+		p := h.mapFunc(ctx, i)
 		putItemInput := &dynamodb.PutItemInput{
 			TableName: &h.tableName,
 			Item:      p,
@@ -44,13 +45,16 @@ func (h *DynamoPutHandler) Handle(ctx context.Context, input <-chan interface{})
 		logger.Debugw("putItem created", "putItemInput", putItemInput)
 
 		go func() {
-			_, err := h.dynamoDbClient.PutItem(context.Background(), putItemInput)
+			defer close(output)
+			r, err := h.dynamoDbClient.PutItem(context.Background(), putItemInput)
+			logger.Debugw("dynamoDb.PutItem returns", "return", r)
 			if err != nil {
 				logger.Error(err)
 				cancelFunc(err)
 			}
+			output <- r
 		}()
-		return newCtx, input
+		return newCtx, output
 	case <-ctx.Done():
 		cancelFunc(ctx.Err())
 		return newCtx, input

@@ -11,7 +11,7 @@ import (
 	"github.com/palindrom615/requestbin/handler/db"
 )
 
-func TestNewDynamoPutHandler(t *testing.T) {
+func getRealDB() *dynamodb.Client {
 	cfg, err := config.LoadDefaultConfig(
 		context.TODO(),
 	)
@@ -19,11 +19,15 @@ func TestNewDynamoPutHandler(t *testing.T) {
 		panic(err.Error())
 	}
 
-	dynamoClient := dynamodb.NewFromConfig(cfg)
+	return dynamodb.NewFromConfig(cfg)
+}
+
+func TestNewDynamoPutHandler(t *testing.T) {
+	dynamoClient := getRealDB()
 	keyVal := func(ctx context.Context, input interface{}) map[string]types.AttributeValue {
 		m := make(map[string]types.AttributeValue)
 		m["mid"], _ = attributevalue.Marshal("key")
-		m["info"], _ = attributevalue.Marshal("{}")
+		m["info"], _ = attributevalue.Marshal("{asdf}")
 		return m
 	}
 
@@ -36,6 +40,7 @@ func TestNewDynamoPutHandler(t *testing.T) {
 	go func() {
 		inputChan <- nil
 	}()
-	ctx, _ := handler.Handle(context.Background(), inputChan)
+	ctx, o := handler.Handle(context.Background(), inputChan)
+	t.Log(<-o)
 	t.Log(ctx)
 }

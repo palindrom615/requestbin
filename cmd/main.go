@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/palindrom615/requestbin"
 	"github.com/palindrom615/requestbin/handler"
@@ -16,7 +17,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-func HandleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (*events.LambdaFunctionURLResponse, error) {
+const requestCtxKey = "request"
+
+func HandleRequest(ctx context.Context, request events.LambdaFunctionURLRequest) (res *events.LambdaFunctionURLResponse, e error) {
 	logger := requestbin.GetLogger()
 	var awsCfg, err = config.LoadDefaultConfig(context.TODO())
 	if err != nil {
@@ -24,47 +27,68 @@ func HandleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 		panic(err)
 	}
 
-	dynamoDbHandler := buildDynamoDbHandler(awsCfg, "host")
 	h := handler.NewComposeHandler(
-		dynamoDbHandler,
 		handler.NewEmbedCtxHandler(
 			func(ctx context.Context, input interface{}) (handler.CtxKey, any) {
-				return "request", input
+				return requestCtxKey, input
 			},
 		),
+		buildDynamoDbHandler(awsCfg, "host"),
 	)
-	handlerCtx, cancelFunc := context.WithCancelCause(context.Background())
-
-	go func() {
-		<-ctx.Done()
-		cancelFunc(ctx.Err())
-	}()
+	handlerCtx := context.Background()
 
 	inputChan := make(chan interface{})
-	h.Handle(handlerCtx, inputChan)
+	defer close(inputChan)
+
+	done := make(chan any)
+	defer close(done)
 
 	go func() {
-		inputChan <- &request
+		outCtx, outChan := h.Handle(handlerCtx, inputChan)
+		select {
+		case <-outCtx.Done():
+			logger.Errorw("canceled", "error", outCtx.Err())
+			res = &events.LambdaFunctionURLResponse{
+				StatusCode: 500,
+				Headers:    map[string]string{"Content-Type": "text/plain"},
+				Body:       outCtx.Err().Error(),
+			}
+
+		case out := <-outChan:
+			logger.Debugw("output", "out", out)
+			res = &events.LambdaFunctionURLResponse{
+				StatusCode: 200,
+				Headers:    map[string]string{"Content-Type": "text/plain"},
+				Body:       fmt.Sprintf("%s", out),
+			}
+		}
+		done <- nil
 	}()
 
-	return &events.LambdaFunctionURLResponse{
-		StatusCode: 200,
-		Headers:    map[string]string{"Content-Type": "text/plain"},
-	}, nil
+	inputChan <- &request
+	<-done
+	logger.Infow("done")
+
+	return
 }
 
 func buildDynamoDbHandler(awsCfg aws.Config, tableNme string) *db.DynamoPutHandler {
 	dynamoClient := dynamodb.NewFromConfig(awsCfg)
-	keyVal := func(ctx context.Context, input interface{}) map[string]types.AttributeValue {
+	logger := requestbin.GetLogger()
+	mapFunc := func(ctx context.Context, input interface{}) map[string]types.AttributeValue {
 		m := make(map[string]types.AttributeValue)
+		var e error
 		m["mid"], _ = attributevalue.Marshal("key")
-		m["info"], _ = attributevalue.Marshal("{}")
+		m["info"], e = attributevalue.Marshal(input)
+		if e != nil {
+			logger.Errorw("info marshall fail", "err", e)
+		}
 		return m
 	}
 	return db.NewDynamoPutHandler(
 		dynamoClient,
 		tableNme,
-		keyVal,
+		mapFunc,
 	)
 }
 
