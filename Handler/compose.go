@@ -12,16 +12,12 @@ func NewComposeHandler(handlers ...Handler[interface{}, interface{}]) *ComposeHa
 	}
 }
 
-func (h *ComposeHandler) Handle(ctx context.Context, input <-chan interface{}) (context.Context, <-chan interface{}, error) {
+func (h *ComposeHandler) Handle(ctx context.Context, input <-chan interface{}) (context.Context, <-chan interface{}) {
 	out := make(chan interface{})
 	lastOutput := input
-	var err error
 	for _, handler := range h.handlers {
-		ctx, lastOutput, err = handler.Handle(ctx, lastOutput)
-		if err != nil {
-			return ctx, lastOutput, err
-		}
+		ctx, lastOutput = handler.Handle(ctx, lastOutput)
 	}
 	out <- <-input
-	return ctx, out, nil
+	return ctx, out
 }

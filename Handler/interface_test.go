@@ -14,7 +14,7 @@ func TestIdentityHandler(t *testing.T) {
 	// act
 	ctx := context.Background()
 	i := make(chan string)
-	newCtx, o, e := h.Handle(ctx, i)
+	newCtx, o := h.Handle(ctx, i)
 	go func() {
 		i <- "test"
 	}()
@@ -25,8 +25,5 @@ func TestIdentityHandler(t *testing.T) {
 	}
 	if <-o != "test" {
 		t.Errorf("IdentityHandler should return unchanged Context, got %v", o)
-	}
-	if e != nil {
-		t.Errorf("IdentityHandler got non-nil error %v", e)
 	}
 }

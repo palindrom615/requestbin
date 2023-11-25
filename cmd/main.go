@@ -27,13 +27,19 @@ func HandleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 	dynamoDbHandler := buildDynamoDbHandler(awsCfg, "host")
 	h := handler.NewComposeHandler(
 		dynamoDbHandler,
-		handler.NewEmbedInputHandler(
-			func(ctx context.Context, input interface{}) handler.CtxKey {
-				return "request"
+		handler.NewEmbedCtxHandler(
+			func(ctx context.Context, input interface{}) (handler.CtxKey, any) {
+				return "request", input
 			},
 		),
 	)
-	handlerCtx := context.Background()
+	handlerCtx, cancelFunc := context.WithCancelCause(context.Background())
+
+	go func() {
+		<-ctx.Done()
+		cancelFunc(ctx.Err())
+	}()
+
 	inputChan := make(chan interface{})
 	h.Handle(handlerCtx, inputChan)
 
@@ -41,13 +47,6 @@ func HandleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 		inputChan <- &request
 	}()
 
-	if request.RequestContext.HTTP.Method != "POST" {
-		return &events.LambdaFunctionURLResponse{
-			StatusCode: 405,
-			Headers:    map[string]string{"Content-Type": "text/plain"},
-			Body:       "Method Not Allowed",
-		}, nil
-	}
 	return &events.LambdaFunctionURLResponse{
 		StatusCode: 200,
 		Headers:    map[string]string{"Content-Type": "text/plain"},

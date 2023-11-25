@@ -1,24 +1,35 @@
 package handler
 
-import "context"
+import (
+	"context"
 
-type CtxKey string
-type EmbedInputHandler[I any] struct {
-	calcKey func(ctx context.Context, input I) CtxKey
+	"github.com/palindrom615/requestbin"
+)
+
+type CtxKey any
+
+type EmbedCtxHandler[I any] struct {
+	getNewCtxVal func(ctx context.Context, input I) (CtxKey, any)
 }
 
-func NewEmbedInputHandler[I any](calcKey func(ctx context.Context, input I) CtxKey) *EmbedInputHandler[I] {
-	return &EmbedInputHandler[I]{
-		calcKey: calcKey,
+func NewEmbedCtxHandler[I any](getNewCtxVal func(ctx context.Context, input I) (CtxKey, any)) *EmbedCtxHandler[I] {
+	return &EmbedCtxHandler[I]{
+		getNewCtxVal: getNewCtxVal,
 	}
 }
 
-func (h *EmbedInputHandler[I]) Handle(ctx context.Context, input <-chan I) (context.Context, <-chan I, error) {
-	i := <-input
-	out := make(chan I)
-	go func() {
-		out <- i
-	}()
-	key := h.calcKey(ctx, i)
-	return context.WithValue(ctx, key, i), out, nil
+func (h *EmbedCtxHandler[I]) Handle(ctx context.Context, input <-chan I) (context.Context, <-chan I) {
+	logger := requestbin.GetLogger()
+	select {
+	case i := <-input:
+		out := make(chan I)
+		go func() {
+			out <- i
+		}()
+		key, val := h.getNewCtxVal(ctx, i)
+		logger.Debugw("new context value", "key", key, "value", val)
+		return context.WithValue(ctx, key, val), out
+	case <-ctx.Done():
+		return ctx, input
+	}
 }

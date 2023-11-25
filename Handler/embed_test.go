@@ -2,24 +2,22 @@ package handler_test
 
 import (
 	"context"
-	"github.com/palindrom615/requestbin/handler"
 	"testing"
+
+	"github.com/palindrom615/requestbin/handler"
 )
 
 func TestEmbedInputHandler_Handle(t *testing.T) {
-	eih := handler.NewEmbedInputHandler(
-		func(ctx context.Context, input interface{}) handler.CtxKey {
-			return "key"
+	eih := handler.NewEmbedCtxHandler(
+		func(ctx context.Context, input interface{}) (handler.CtxKey, any) {
+			return "key", "value"
 		},
 	)
 	i := make(chan interface{})
 	go func() {
 		i <- "value"
 	}()
-	ctx, _, err := eih.Handle(context.Background(), i)
-	if err != nil {
-		t.Error(err)
-	}
+	ctx, _ := eih.Handle(context.Background(), i)
 	if ctx.Value(handler.CtxKey("key")) != "value" {
 		t.Errorf("context value not set; expected 'value', got %v", ctx.Value("key"))
 	}
