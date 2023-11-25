@@ -2,8 +2,16 @@ package requestbin
 
 import "go.uber.org/zap"
 
-func NewLogger() (*zap.SugaredLogger, error) {
-	logger, err := zap.NewProduction()
-	sugar := logger.Sugar()
-	return sugar, err
+var sugar *zap.SugaredLogger
+
+func GetLogger() *zap.SugaredLogger {
+	if sugar != nil {
+		return sugar
+	}
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+	sugar = logger.Sugar()
+	return sugar
 }
