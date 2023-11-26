@@ -53,6 +53,7 @@ func HandleRequest(ctx context.Context, request *events.LambdaFunctionURLRequest
 					m = make(map[string]any)
 					err = json.Unmarshal([]byte(body), &m)
 					if m["code"] == nil || m["mid"] == nil {
+						logger.Errorw("no required fields", "unmarshalled", m, "body", body)
 						return m, ErrInvalidBody
 					}
 					return
