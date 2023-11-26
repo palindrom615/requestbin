@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/palindrom615/requestbin"
@@ -16,6 +18,8 @@ import (
 )
 
 const requestCtxKey = "request"
+
+var ErrInvalidBody = errors.New("invalid body")
 
 func HandleRequest(ctx context.Context, request *events.LambdaFunctionURLRequest) (res *events.LambdaFunctionURLResponse, e error) {
 	logger := requestbin.GetLogger()
@@ -40,18 +44,23 @@ func HandleRequest(ctx context.Context, request *events.LambdaFunctionURLRequest
 		),
 		handler.NewConsHandler(
 			handler.NewMappingHandler(
-				func(ctx context.Context, input *events.LambdaFunctionURLRequest) (string, error) {
-
-					return "", nil
+				func(ctx context.Context, input *events.LambdaFunctionURLRequest) (m map[string]any, err error) {
+					body := input.Body
+					m = make(map[string]any)
+					err = json.Unmarshal([]byte(body), &m)
+					if m["code"] == nil || m["mid"] == nil {
+						return m, ErrInvalidBody
+					}
+					return
 				},
 			),
 			handler.NewDynamoPutHandler(
 				dynamodb.NewFromConfig(awsCfg),
 				"host",
-				func(ctx context.Context, input string) map[string]types.AttributeValue {
+				func(ctx context.Context, input map[string]any) map[string]types.AttributeValue {
 					m := make(map[string]types.AttributeValue)
 					var e error
-					m["mid"], _ = attributevalue.Marshal("key")
+					m["mid"], _ = attributevalue.Marshal(input["mid"])
 					m["info"], e = attributevalue.Marshal(input)
 					if e != nil {
 						logger.Errorw("info marshall fail", "err", e)
