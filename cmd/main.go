@@ -77,7 +77,7 @@ func HandleRequest(ctx context.Context, request *events.LambdaFunctionURLRequest
 			res = &events.LambdaFunctionURLResponse{
 				StatusCode: 500,
 				Headers:    map[string]string{"Content-Type": "text/plain"},
-				Body:       outCtx.Err().Error(),
+				Body:       fmt.Sprint(context.Cause(outCtx)),
 			}
 
 		case out := <-outChan:
@@ -85,7 +85,7 @@ func HandleRequest(ctx context.Context, request *events.LambdaFunctionURLRequest
 			res = &events.LambdaFunctionURLResponse{
 				StatusCode: 200,
 				Headers:    map[string]string{"Content-Type": "text/plain"},
-				Body:       fmt.Sprintf("%s", out),
+				Body:       fmt.Sprint(out),
 			}
 		}
 		done <- nil
