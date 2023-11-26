@@ -6,7 +6,6 @@ import (
 
 	"github.com/palindrom615/requestbin"
 	"github.com/palindrom615/requestbin/handler"
-	"github.com/palindrom615/requestbin/handler/db"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -46,7 +45,7 @@ func HandleRequest(ctx context.Context, request *events.LambdaFunctionURLRequest
 					return "", nil
 				},
 			),
-			db.NewDynamoPutHandler(
+			handler.NewDynamoPutHandler(
 				dynamodb.NewFromConfig(awsCfg),
 				"host",
 				func(ctx context.Context, input string) map[string]types.AttributeValue {

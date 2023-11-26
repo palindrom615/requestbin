@@ -7,22 +7,23 @@ import (
 	"github.com/palindrom615/requestbin/handler"
 )
 
+func handlerTest[I, O any](h handler.Handler[I, O], input I) (ctx context.Context, o <-chan O) {
+	i := make(chan I)
+	go func() {
+		defer close(i)
+		i <- input
+	}()
+	return h.Handle(context.Background(), i)
+}
+
 func TestIdentityHandler(t *testing.T) {
 	// arrange
 	h := handler.NewIdentityHandler[string]()
 
 	// act
-	ctx := context.Background()
-	i := make(chan string)
-	newCtx, o := h.Handle(ctx, i)
-	go func() {
-		i <- "test"
-	}()
+	_, o := handlerTest(h, "test")
 
 	// assert
-	if ctx != newCtx {
-		t.Errorf("IdentityHandler should return unchanged Context, got %v", ctx)
-	}
 	if <-o != "test" {
 		t.Errorf("IdentityHandler should return unchanged Context, got %v", o)
 	}

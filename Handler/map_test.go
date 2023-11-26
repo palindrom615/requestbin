@@ -15,14 +15,9 @@ func TestMappingHandler_map_without_err(t *testing.T) {
 			return input + 3, nil
 		},
 	)
-	i := make(chan int)
-	go func() {
-		defer close(i)
-		i <- 2
-	}()
 
 	// act
-	ctx, res := add3Handler.Handle(context.Background(), i)
+	ctx, res := handlerTest(add3Handler, 2)
 
 	// assert
 	select {
@@ -43,14 +38,9 @@ func TestMappingHandler_map_with_err(t *testing.T) {
 			return 0, errThrown
 		},
 	)
-	i := make(chan int)
-	go func() {
-		defer close(i)
-		i <- 2
-	}()
 
 	// act
-	ctx, res := add3Handler.Handle(context.Background(), i)
+	ctx, res := handlerTest(add3Handler, 2)
 
 	// assert
 	<-ctx.Done()

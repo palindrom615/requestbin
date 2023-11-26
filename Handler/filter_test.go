@@ -13,14 +13,9 @@ func isOkay(ctx context.Context, input string) bool {
 func TestFilteringHandler_HandleOkay(t *testing.T) {
 	// arrange
 	handler := handler.NewFilteringHandler(isOkay)
-	i := make(chan string)
-
-	go func() {
-		i <- "okay"
-	}()
 
 	// act
-	newCtx, o := handler.Handle(context.Background(), i)
+	newCtx, o := handlerTest(handler, "okay")
 
 	// assert
 	select {
@@ -37,14 +32,9 @@ func TestFilteringHandler_HandleOkay(t *testing.T) {
 func TestFilteringHandler_HandleNotokay(t *testing.T) {
 	// arrange
 	h := handler.NewFilteringHandler(isOkay)
-	i := make(chan string)
-
-	go func() {
-		i <- "notOkay"
-	}()
 
 	// act
-	newCtx, o := h.Handle(context.Background(), i)
+	newCtx, o := handlerTest(h, "notOkay")
 
 	// assert
 	<-newCtx.Done()

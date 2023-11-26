@@ -8,16 +8,17 @@ import (
 )
 
 func TestEmbedInputHandler_Handle(t *testing.T) {
+	// arrange
 	eih := handler.NewEmbedCtxHandler(
 		func(ctx context.Context, input interface{}) (handler.CtxKey, any) {
 			return "key", "value"
 		},
 	)
-	i := make(chan interface{})
-	go func() {
-		i <- "value"
-	}()
-	ctx, _ := eih.Handle(context.Background(), i)
+
+	// act
+	ctx, _ := handlerTest(eih, "value")
+
+	// assert
 	if ctx.Value(handler.CtxKey("key")) != "value" {
 		t.Errorf("context value not set; expected 'value', got %v", ctx.Value("key"))
 	}

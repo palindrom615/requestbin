@@ -1,4 +1,4 @@
-package db
+package handler
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/palindrom615/requestbin"
-	"github.com/palindrom615/requestbin/handler"
 )
 
 type DynamoPutHandler[I any] struct {
@@ -23,7 +22,7 @@ func NewDynamoPutHandler[I any](
 	db DynamoDBAPI,
 	tableName string,
 	getItem func(context context.Context, input I) map[string]types.AttributeValue,
-) handler.Handler[I, *dynamodb.PutItemOutput] {
+) Handler[I, *dynamodb.PutItemOutput] {
 	return &DynamoPutHandler[I]{
 		dynamoDbClient: db,
 		tableName:      tableName,
