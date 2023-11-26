@@ -20,6 +20,7 @@ import (
 const requestCtxKey = "request"
 
 var ErrInvalidBody = errors.New("invalid body")
+var ErrInvalidMethod = errors.New("invalid method")
 
 func HandleRequest(ctx context.Context, request *events.LambdaFunctionURLRequest) (res *events.LambdaFunctionURLResponse, e error) {
 	logger := requestbin.GetLogger()
@@ -37,8 +38,11 @@ func HandleRequest(ctx context.Context, request *events.LambdaFunctionURLRequest
 				},
 			),
 			handler.NewFilteringHandler(
-				func(ctx context.Context, req *events.LambdaFunctionURLRequest) bool {
-					return req.RequestContext.HTTP.Method == "POST"
+				func(ctx context.Context, req *events.LambdaFunctionURLRequest) error {
+					if req.RequestContext.HTTP.Method == "POST" {
+						return ErrInvalidMethod
+					}
+					return nil
 				},
 			),
 		),

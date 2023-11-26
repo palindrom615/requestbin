@@ -8,12 +8,12 @@ import (
 var ErrFiltered = errors.New("filtered")
 
 type FilteringHandler[I any] struct {
-	isOkay func(ctx context.Context, input I) bool
+	filter func(ctx context.Context, input I) error
 }
 
-func NewFilteringHandler[I any](isOkay func(ctx context.Context, input I) bool) Handler[I, I] {
+func NewFilteringHandler[I any](filter func(ctx context.Context, input I) error) Handler[I, I] {
 	return &FilteringHandler[I]{
-		isOkay: isOkay,
+		filter: filter,
 	}
 }
 
@@ -28,8 +28,9 @@ func (f *FilteringHandler[I]) Handle(ctx context.Context, input <-chan I) (conte
 			defer close(o)
 			o <- i
 		}()
-		if !f.isOkay(ctx, i) {
-			cancel(ErrFiltered)
+		err := f.filter(ctx, i)
+		if err != nil {
+			cancel(err)
 		}
 		return newCtx, o
 	}
