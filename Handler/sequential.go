@@ -6,7 +6,7 @@ type SequentialHandler struct {
 	handlers []Handler[any, any]
 }
 
-func NewSequentialHandler(handlers ...Handler[any, any]) *SequentialHandler {
+func NewSequentialHandler(handlers ...Handler[any, any]) Handler[any, any] {
 	return &SequentialHandler{
 		handlers: handlers,
 	}

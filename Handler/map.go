@@ -8,7 +8,7 @@ type MappingHandler[I any, O any] struct {
 	mapper func(ctx context.Context, input I) (O, error)
 }
 
-func NewMappingHandler[I any, O any](mapper func(ctx context.Context, input I) (O, error)) *MappingHandler[I, O] {
+func NewMappingHandler[I any, O any](mapper func(ctx context.Context, input I) (O, error)) Handler[I, O] {
 	return &MappingHandler[I, O]{
 		mapper: mapper,
 	}

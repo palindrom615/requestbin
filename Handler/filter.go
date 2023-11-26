@@ -11,7 +11,7 @@ type FilteringHandler[I any] struct {
 	isOkay func(ctx context.Context, input I) bool
 }
 
-func NewFilteringHandler[I any](isOkay func(ctx context.Context, input I) bool) *FilteringHandler[I] {
+func NewFilteringHandler[I any](isOkay func(ctx context.Context, input I) bool) Handler[I, I] {
 	return &FilteringHandler[I]{
 		isOkay: isOkay,
 	}

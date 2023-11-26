@@ -8,17 +8,17 @@ import (
 
 type CtxKey any
 
-type EmbedCtxHandler[I any] struct {
-	getNewCtxVal func(ctx context.Context, input I) (CtxKey, any)
+type EmbedCtxHandler[I, V any] struct {
+	getNewCtxVal func(ctx context.Context, input I) (CtxKey, V)
 }
 
-func NewEmbedCtxHandler[I any](getNewCtxVal func(ctx context.Context, input I) (CtxKey, any)) *EmbedCtxHandler[I] {
-	return &EmbedCtxHandler[I]{
+func NewEmbedCtxHandler[I, V any](getNewCtxVal func(ctx context.Context, input I) (CtxKey, V)) Handler[I, I] {
+	return &EmbedCtxHandler[I, V]{
 		getNewCtxVal: getNewCtxVal,
 	}
 }
 
-func (h *EmbedCtxHandler[I]) Handle(ctx context.Context, input <-chan I) (context.Context, <-chan I) {
+func (h *EmbedCtxHandler[I, V]) Handle(ctx context.Context, input <-chan I) (context.Context, <-chan I) {
 	logger := requestbin.GetLogger()
 	select {
 	case i := <-input:

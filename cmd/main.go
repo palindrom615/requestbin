@@ -10,7 +10,6 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -29,11 +28,35 @@ func HandleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 
 	h := handler.NewSequentialHandler(
 		handler.NewEmbedCtxHandler(
-			func(ctx context.Context, input any) (handler.CtxKey, any) {
-				return requestCtxKey, input.(events.LambdaFunctionURLRequest)
+			func(ctx context.Context, input events.LambdaFunctionURLRequest) (handler.CtxKey, events.LambdaFunctionURLRequest) {
+				return requestCtxKey, input
 			},
-		),
-		buildDynamoDbHandler(awsCfg, "host"),
+		).(handler.Handler[any, any]),
+		handler.NewFilteringHandler(
+			func(ctx context.Context, req events.LambdaFunctionURLRequest) bool {
+				return req.RequestContext.HTTP.Method == "POST"
+			},
+		).(handler.Handler[any, any]),
+		handler.NewMappingHandler(
+			func(ctx context.Context, input events.LambdaFunctionURLRequest) (string, error) {
+
+				return "", nil
+			},
+		).(handler.Handler[any, any]),
+		db.NewDynamoPutHandler(
+			dynamodb.NewFromConfig(awsCfg),
+			"host",
+			func(ctx context.Context, input interface{}) map[string]types.AttributeValue {
+				m := make(map[string]types.AttributeValue)
+				var e error
+				m["mid"], _ = attributevalue.Marshal("key")
+				m["info"], e = attributevalue.Marshal(input)
+				if e != nil {
+					logger.Errorw("info marshall fail", "err", e)
+				}
+				return m
+			},
+		).(handler.Handler[any, any]),
 	)
 	handlerCtx := context.Background()
 
@@ -70,26 +93,6 @@ func HandleRequest(ctx context.Context, request events.LambdaFunctionURLRequest)
 	logger.Infow("done")
 
 	return
-}
-
-func buildDynamoDbHandler(awsCfg aws.Config, tableNme string) *db.DynamoPutHandler {
-	dynamoClient := dynamodb.NewFromConfig(awsCfg)
-	logger := requestbin.GetLogger()
-	mapFunc := func(ctx context.Context, input interface{}) map[string]types.AttributeValue {
-		m := make(map[string]types.AttributeValue)
-		var e error
-		m["mid"], _ = attributevalue.Marshal("key")
-		m["info"], e = attributevalue.Marshal(input)
-		if e != nil {
-			logger.Errorw("info marshall fail", "err", e)
-		}
-		return m
-	}
-	return db.NewDynamoPutHandler(
-		dynamoClient,
-		tableNme,
-		mapFunc,
-	)
 }
 
 func main() {

@@ -6,37 +6,38 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/palindrom615/requestbin"
+	"github.com/palindrom615/requestbin/handler"
 )
 
-type DynamoPutHandler struct {
+type DynamoPutHandler[I any] struct {
 	dynamoDbClient DynamoDBAPI
 	tableName      string
-	mapFunc        func(context context.Context, input interface{}) map[string]types.AttributeValue
+	mapFunc        func(context context.Context, input I) map[string]types.AttributeValue
 }
 
 type DynamoDBAPI interface {
 	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 }
 
-func NewDynamoPutHandler(
+func NewDynamoPutHandler[I any](
 	db DynamoDBAPI,
 	tableName string,
-	getItem func(context context.Context, input interface{}) map[string]types.AttributeValue,
-) *DynamoPutHandler {
-	return &DynamoPutHandler{
+	getItem func(context context.Context, input I) map[string]types.AttributeValue,
+) handler.Handler[I, *dynamodb.PutItemOutput] {
+	return &DynamoPutHandler[I]{
 		dynamoDbClient: db,
 		tableName:      tableName,
 		mapFunc:        getItem,
 	}
 }
 
-func (h *DynamoPutHandler) Handle(ctx context.Context, input <-chan interface{}) (context.Context, <-chan interface{}) {
+func (h *DynamoPutHandler[I]) Handle(ctx context.Context, input <-chan I) (context.Context, <-chan *dynamodb.PutItemOutput) {
 	logger := requestbin.GetLogger()
 	newCtx, cancelFunc := context.WithCancelCause(ctx)
+	output := make(chan *dynamodb.PutItemOutput)
 
 	select {
 	case i := <-input:
-		output := make(chan any)
 		p := h.mapFunc(ctx, i)
 		putItemInput := &dynamodb.PutItemInput{
 			TableName: &h.tableName,
@@ -57,7 +58,8 @@ func (h *DynamoPutHandler) Handle(ctx context.Context, input <-chan interface{})
 		return newCtx, output
 	case <-ctx.Done():
 		cancelFunc(ctx.Err())
-		return newCtx, input
+		close(output)
+		return newCtx, output
 	}
 
 }

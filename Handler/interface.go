@@ -8,7 +8,7 @@ type Handler[I any, O any] interface {
 
 type IdentityHandler[I any] struct{}
 
-func NewIdentityHandler[I any]() *IdentityHandler[I] {
+func NewIdentityHandler[I any]() Handler[I, I] {
 	return &IdentityHandler[I]{}
 }
 
