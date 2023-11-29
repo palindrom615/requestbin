@@ -39,7 +39,7 @@ func HandleRequest(ctx context.Context, request *events.LambdaFunctionURLRequest
 			),
 			handler.NewFilteringHandler(
 				func(ctx context.Context, req *events.LambdaFunctionURLRequest) error {
-					if req.RequestContext.HTTP.Method == "POST" {
+					if req.RequestContext.HTTP.Method != "POST" {
 						return ErrInvalidMethod
 					}
 					return nil
