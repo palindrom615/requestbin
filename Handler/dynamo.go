@@ -32,7 +32,7 @@ func NewDynamoPutHandler[I any](
 
 func (h *DynamoPutHandler[I]) Handle(ctx context.Context, input <-chan I) (context.Context, <-chan *dynamodb.PutItemOutput) {
 	logger := requestbin.GetLogger()
-	newCtx, cancelFunc := context.WithCancelCause(ctx)
+	newCtx, cancel := context.WithCancelCause(ctx)
 	output := make(chan *dynamodb.PutItemOutput)
 
 	select {
@@ -50,13 +50,13 @@ func (h *DynamoPutHandler[I]) Handle(ctx context.Context, input <-chan I) (conte
 			logger.Debugw("dynamoDb.PutItem returns", "return", r)
 			if err != nil {
 				logger.Error(err)
-				cancelFunc(err)
+				cancel(err)
 			}
 			output <- r
 		}()
 		return newCtx, output
 	case <-ctx.Done():
-		cancelFunc(ctx.Err())
+		cancel(context.Cause(ctx))
 		close(output)
 		return newCtx, output
 	}

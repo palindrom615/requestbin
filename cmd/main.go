@@ -87,7 +87,7 @@ func HandleRequest(ctx context.Context, request *events.LambdaFunctionURLRequest
 		outCtx, outChan := h.Handle(handlerCtx, inputChan)
 		select {
 		case <-outCtx.Done():
-			logger.Errorw("canceled", "error", outCtx.Err())
+			logger.Errorw("canceled", "error", context.Cause(outCtx))
 			res = &events.LambdaFunctionURLResponse{
 				StatusCode: 500,
 				Headers:    map[string]string{"Content-Type": "text/plain"},
