@@ -2,8 +2,6 @@ package handler
 
 import (
 	"context"
-
-	"github.com/palindrom615/requestbin"
 )
 
 type CtxKey any
@@ -19,7 +17,6 @@ func NewEmbedCtxHandler[I, V any](getNewCtxVal func(ctx context.Context, input I
 }
 
 func (h *EmbedCtxHandler[I, V]) Handle(ctx context.Context, input <-chan I) (context.Context, <-chan I) {
-	logger := requestbin.GetLogger()
 	select {
 	case i := <-input:
 		out := make(chan I)

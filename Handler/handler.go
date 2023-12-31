@@ -1,6 +1,11 @@
 package handler
 
-import "context"
+import (
+	"context"
+	"github.com/palindrom615/requestbin"
+)
+
+var logger = requestbin.GetLogger()
 
 type Handler[I any, O any] interface {
 	Handle(ctx context.Context, input <-chan I) (context.Context, <-chan O)

@@ -2,10 +2,8 @@ package handler
 
 import (
 	"context"
-
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/palindrom615/requestbin"
 )
 
 type DynamoPutHandler[I any] struct {
@@ -31,7 +29,6 @@ func NewDynamoPutHandler[I any](
 }
 
 func (h *DynamoPutHandler[I]) Handle(ctx context.Context, input <-chan I) (context.Context, <-chan *dynamodb.PutItemOutput) {
-	logger := requestbin.GetLogger()
 	newCtx, cancel := context.WithCancelCause(ctx)
 	output := make(chan *dynamodb.PutItemOutput)
 

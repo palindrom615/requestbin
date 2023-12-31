@@ -8,7 +8,7 @@ func GetLogger() *zap.SugaredLogger {
 	if sugar != nil {
 		return sugar
 	}
-	logger, err := zap.NewDevelopment()
+	logger, err := zap.NewDevelopment(zap.AddCaller())
 	if err != nil {
 		panic(err)
 	}
