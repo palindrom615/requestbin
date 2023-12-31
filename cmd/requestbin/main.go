@@ -5,16 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
 	"github.com/palindrom615/requestbin"
+	"github.com/palindrom615/requestbin/datastore"
 	"github.com/palindrom615/requestbin/handler"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 const requestCtxKey = "request"
@@ -22,6 +20,13 @@ const requestCtxKey = "request"
 var ErrInvalidBody = errors.New("invalid body")
 var ErrInvalidMethod = errors.New("invalid method")
 var logger = requestbin.GetLogger()
+
+const tableName = "host"
+const keyName = "mid"
+
+func provideTable(tableName, keyName string) *datastore.Table {
+	return datastore.NewTable(tableName, keyName)
+}
 
 func provideDynamoDBClient() *dynamodb.Client {
 	var awsCfg, err = config.LoadDefaultConfig(context.Background())
@@ -31,7 +36,7 @@ func provideDynamoDBClient() *dynamodb.Client {
 	return dynamodb.NewFromConfig(awsCfg)
 }
 
-func provideHandler(cli *dynamodb.Client) handler.Handler[*events.LambdaFunctionURLRequest, *dynamodb.PutItemOutput] {
+func provideHandler(cli *dynamodb.Client, table *datastore.Table) handler.Handler[*events.LambdaFunctionURLRequest, *dynamodb.PutItemOutput] {
 	filteringMethod := func(ctx context.Context, req *events.LambdaFunctionURLRequest) error {
 		if req.RequestContext.HTTP.Method != "POST" {
 			return ErrInvalidMethod
@@ -48,15 +53,8 @@ func provideHandler(cli *dynamodb.Client) handler.Handler[*events.LambdaFunction
 		}
 		return
 	}
-	dynamoAttributeMapper := func(ctx context.Context, input map[string]any) map[string]types.AttributeValue {
-		m := make(map[string]types.AttributeValue)
-		var e error
-		m["mid"], _ = attributevalue.Marshal(input["mid"])
-		m, e = attributevalue.MarshalMap(input)
-		if e != nil {
-			logger.Errorw("info marshall fail", "err", e)
-		}
-		return m
+	dynamoAttributeMapper := func(context context.Context, input map[string]any) (*dynamodb.PutItemInput, error) {
+		return table.MakePutItemInput(input["mid"].(string), input)
 	}
 
 	return handler.NewConsHandler(
@@ -72,7 +70,6 @@ func provideHandler(cli *dynamodb.Client) handler.Handler[*events.LambdaFunction
 			handler.NewMappingHandler(bodyMapper),
 			handler.NewDynamoPutHandler(
 				cli,
-				"host",
 				dynamoAttributeMapper,
 			),
 		),
@@ -121,7 +118,8 @@ func provideHandlerRequest[O any](h handler.Handler[*events.LambdaFunctionURLReq
 
 func main() {
 	cli := provideDynamoDBClient()
-	h := provideHandler(cli)
+	table := provideTable(tableName, keyName)
+	h := provideHandler(cli, table)
 	handleRequest := provideHandlerRequest(h)
 	lambda.Start(handleRequest)
 }

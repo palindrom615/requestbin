@@ -3,13 +3,11 @@ package handler
 import (
 	"context"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
 type DynamoPutHandler[I any] struct {
 	dynamoDbClient DynamoDBAPI
-	tableName      string
-	mapFunc        func(context context.Context, input I) map[string]types.AttributeValue
+	getInput       func(context context.Context, input I) (*dynamodb.PutItemInput, error)
 }
 
 type DynamoDBAPI interface {
@@ -18,13 +16,11 @@ type DynamoDBAPI interface {
 
 func NewDynamoPutHandler[I any](
 	db DynamoDBAPI,
-	tableName string,
-	getItem func(context context.Context, input I) map[string]types.AttributeValue,
+	getInput func(context context.Context, input I) (*dynamodb.PutItemInput, error),
 ) Handler[I, *dynamodb.PutItemOutput] {
 	return &DynamoPutHandler[I]{
 		dynamoDbClient: db,
-		tableName:      tableName,
-		mapFunc:        getItem,
+		getInput:       getInput,
 	}
 }
 
@@ -34,16 +30,17 @@ func (h *DynamoPutHandler[I]) Handle(ctx context.Context, input <-chan I) (conte
 
 	select {
 	case i := <-input:
-		p := h.mapFunc(ctx, i)
-		putItemInput := &dynamodb.PutItemInput{
-			TableName: &h.tableName,
-			Item:      p,
+		p, e := h.getInput(ctx, i)
+		if e != nil {
+			logger.Error("PutItemInput creation failed", e)
+			cancel(e)
+			return newCtx, output
 		}
-		logger.Debugw("putItem created", "putItemInput", putItemInput)
+		logger.Debugw("putItem created", "putItemInput", p)
 
 		go func() {
 			defer close(output)
-			r, err := h.dynamoDbClient.PutItem(context.Background(), putItemInput)
+			r, err := h.dynamoDbClient.PutItem(context.Background(), p)
 			logger.Debugw("dynamoDb.PutItem returns", "return", r)
 			if err != nil {
 				logger.Error(err)
