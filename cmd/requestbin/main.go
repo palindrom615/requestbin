@@ -21,97 +21,107 @@ const requestCtxKey = "request"
 
 var ErrInvalidBody = errors.New("invalid body")
 var ErrInvalidMethod = errors.New("invalid method")
+var logger = requestbin.GetLogger()
 
-func HandleRequest(ctx context.Context, request *events.LambdaFunctionURLRequest) (res *events.LambdaFunctionURLResponse, e error) {
-	logger := requestbin.GetLogger()
-	var awsCfg, err = config.LoadDefaultConfig(context.TODO())
+func provideDynamoDBClient() *dynamodb.Client {
+	var awsCfg, err = config.LoadDefaultConfig(context.Background())
 	if err != nil {
-		logger.Fatal(err)
 		panic(err)
 	}
+	return dynamodb.NewFromConfig(awsCfg)
+}
 
-	h := handler.NewConsHandler(
+func provideHandler(cli *dynamodb.Client) handler.Handler[*events.LambdaFunctionURLRequest, *dynamodb.PutItemOutput] {
+	filteringMethod := func(ctx context.Context, req *events.LambdaFunctionURLRequest) error {
+		if req.RequestContext.HTTP.Method != "POST" {
+			return ErrInvalidMethod
+		}
+		return nil
+	}
+	bodyMapper := func(ctx context.Context, input *events.LambdaFunctionURLRequest) (m map[string]any, err error) {
+		body := input.Body
+		m = make(map[string]any)
+		err = json.Unmarshal([]byte(body), &m)
+		if m["code"] == nil || m["mid"] == nil {
+			logger.Errorw("no required fields", "unmarshalled", m, "body", body)
+			return m, ErrInvalidBody
+		}
+		return
+	}
+	dynamoAttributeMapper := func(ctx context.Context, input map[string]any) map[string]types.AttributeValue {
+		m := make(map[string]types.AttributeValue)
+		var e error
+		m["mid"], _ = attributevalue.Marshal(input["mid"])
+		m, e = attributevalue.MarshalMap(input)
+		if e != nil {
+			logger.Errorw("info marshall fail", "err", e)
+		}
+		return m
+	}
+
+	return handler.NewConsHandler(
 		handler.NewConsHandler(
 			handler.NewEmbedCtxHandler(
 				func(ctx context.Context, input *events.LambdaFunctionURLRequest) (handler.CtxKey, *events.LambdaFunctionURLRequest) {
 					return requestCtxKey, input
 				},
 			),
-			handler.NewFilteringHandler(
-				func(ctx context.Context, req *events.LambdaFunctionURLRequest) error {
-					if req.RequestContext.HTTP.Method != "POST" {
-						return ErrInvalidMethod
-					}
-					return nil
-				},
-			),
+			handler.NewFilteringHandler(filteringMethod),
 		),
 		handler.NewConsHandler(
-			handler.NewMappingHandler(
-				func(ctx context.Context, input *events.LambdaFunctionURLRequest) (m map[string]any, err error) {
-					body := input.Body
-					m = make(map[string]any)
-					err = json.Unmarshal([]byte(body), &m)
-					if m["code"] == nil || m["mid"] == nil {
-						logger.Errorw("no required fields", "unmarshalled", m, "body", body)
-						return m, ErrInvalidBody
-					}
-					return
-				},
-			),
+			handler.NewMappingHandler(bodyMapper),
 			handler.NewDynamoPutHandler(
-				dynamodb.NewFromConfig(awsCfg),
+				cli,
 				"host",
-				func(ctx context.Context, input map[string]any) map[string]types.AttributeValue {
-					m := make(map[string]types.AttributeValue)
-					var e error
-					m["mid"], _ = attributevalue.Marshal(input["mid"])
-					m["info"], e = attributevalue.Marshal(input)
-					if e != nil {
-						logger.Errorw("info marshall fail", "err", e)
-					}
-					return m
-				},
+				dynamoAttributeMapper,
 			),
 		),
 	)
-	handlerCtx := context.Background()
+}
 
-	inputChan := make(chan *events.LambdaFunctionURLRequest)
-	defer close(inputChan)
+func provideHandlerRequest[O any](h handler.Handler[*events.LambdaFunctionURLRequest, O]) func(ctx context.Context, request *events.LambdaFunctionURLRequest) (res *events.LambdaFunctionURLResponse, e error) {
+	return func(ctx context.Context, request *events.LambdaFunctionURLRequest) (res *events.LambdaFunctionURLResponse, e error) {
+		handlerCtx := context.Background()
 
-	done := make(chan any)
-	defer close(done)
+		inputChan := make(chan *events.LambdaFunctionURLRequest)
+		defer close(inputChan)
 
-	go func() {
-		outCtx, outChan := h.Handle(handlerCtx, inputChan)
-		select {
-		case <-outCtx.Done():
-			logger.Errorw("canceled", "error", context.Cause(outCtx))
-			res = &events.LambdaFunctionURLResponse{
-				StatusCode: 500,
-				Headers:    map[string]string{"Content-Type": "text/plain"},
-				Body:       fmt.Sprint(context.Cause(outCtx)),
+		done := make(chan any)
+		defer close(done)
+
+		go func() {
+			outCtx, outChan := h.Handle(handlerCtx, inputChan)
+			select {
+			case <-outCtx.Done():
+				logger.Errorw("canceled", "error", context.Cause(outCtx))
+				res = &events.LambdaFunctionURLResponse{
+					StatusCode: 500,
+					Headers:    map[string]string{"Content-Type": "text/plain"},
+					Body:       fmt.Sprint(context.Cause(outCtx)),
+				}
+
+			case out := <-outChan:
+				logger.Debugw("output", "out", out)
+				res = &events.LambdaFunctionURLResponse{
+					StatusCode: 200,
+					Headers:    map[string]string{"Content-Type": "text/plain"},
+					Body:       fmt.Sprint(out),
+				}
 			}
+			done <- nil
+		}()
 
-		case out := <-outChan:
-			logger.Debugw("output", "out", out)
-			res = &events.LambdaFunctionURLResponse{
-				StatusCode: 200,
-				Headers:    map[string]string{"Content-Type": "text/plain"},
-				Body:       fmt.Sprint(out),
-			}
-		}
-		done <- nil
-	}()
+		inputChan <- request
+		<-done
+		logger.Infow("done")
 
-	inputChan <- request
-	<-done
-	logger.Infow("done")
-
-	return
+		return
+	}
 }
 
 func main() {
-	lambda.Start(HandleRequest)
+	cli := provideDynamoDBClient()
+	h := provideHandler(cli)
+	handleRequest := provideHandlerRequest(h)
+	lambda.Start(handleRequest)
 }
