@@ -1,8 +1,8 @@
-BINARY_NAME=requestbin
+all: requestbin
 
-all:
-	GOARCH=amd64 GOOS=linux go build -o build/$(BINARY_NAME) cmd/main.go
-	zip -j build/$(BINARY_NAME).zip build/$(BINARY_NAME)
+requestbin:
+	GOARCH=amd64 GOOS=linux go build -o build/requestbin ./cmd/requestbin
+	zip -j build/requestbin.zip build/requestbin
 
 clean:
 	go clean
